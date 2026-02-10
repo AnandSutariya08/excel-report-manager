@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "demoproject-c9fbc"
+  },
+  "targets": {
+    "demoproject-c9fbc": {
+      "firestore": {
+        "zaiko": [
+          "zaiko"
+        ]
+      }
+    }
+  }
+}
