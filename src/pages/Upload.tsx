@@ -19,7 +19,7 @@ import {
 type UploadType = 'sales' | 'payment' | 'gst' | 'refund';
 
 const Upload: React.FC = () => {
-  const { companies, getPlatformById, getCompanyById, addUploadedFile } = useData();
+  const { companies, getPlatformById, getCompanyById, addUploadedFile, deductInventoryBySKU } = useData();
   const { toast } = useToast();
   const [selectedCompany, setSelectedCompany] = useState<string>('');
   const [selectedPlatform, setSelectedPlatform] = useState<string>('');
@@ -265,6 +265,16 @@ const Upload: React.FC = () => {
           }
 
           mergedRows.push(mergedRow);
+          
+          // Deduct from inventory if it's a sales upload
+          if (uploadType === 'sales' && mergedRow.sku && mergedRow.quantity) {
+            try {
+              await deductInventoryBySKU(mergedRow.sku, mergedRow.quantity);
+            } catch (invErr) {
+              console.error(`Failed to deduct inventory for SKU ${mergedRow.sku}:`, invErr);
+            }
+          }
+          
           successCount++;
         } catch (e) {
           console.error('Error processing row:', e);

@@ -191,6 +191,7 @@ interface DataContextType {
   updateInventoryItem: (id: string, data: Partial<InventoryItem>) => Promise<void>;
   deleteInventoryItem: (id: string) => Promise<void>;
   getInventoryBySKU: (sku: string) => InventoryItem | undefined;
+  deductInventoryBySKU: (sku: string, quantity: number) => Promise<void>;
   
   // Return operations
   addReturn: (returnData: Omit<Return, 'id' | 'createdAt'>) => Promise<void>;
@@ -486,6 +487,14 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
 
   const getInventoryBySKU = (sku: string) => inventory.find(i => i.sku === sku);
 
+  const deductInventoryBySKU = async (sku: string, quantity: number) => {
+    const item = inventory.find(i => i.sku === sku);
+    if (item) {
+      const newQty = Math.max(0, item.quantity - quantity);
+      await updateInventoryItem(item.id, { quantity: newQty });
+    }
+  };
+
   // Return operations
   const addReturn = async (data: Omit<Return, 'id' | 'createdAt'>) => {
     // Check if return already exists for this order
@@ -590,6 +599,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
       updateReturn,
       isOrderReturned,
       addDeadStock,
+      deductInventoryBySKU,
       addUploadedFile,
       deleteUploadedFile,
     }}>

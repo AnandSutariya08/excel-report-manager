@@ -33,9 +33,10 @@ import {
   Image as ImageIcon, 
   Printer, 
   Download,
-  Upload,
+  Upload as UploadIcon,
   X,
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 const Inventory: React.FC = () => {
   const { inventory, addInventoryItem, updateInventoryItem, deadStock } = useData();
@@ -44,6 +45,54 @@ const Inventory: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isPrintOpen, setIsPrintOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const bulkInputRef = useRef<HTMLInputElement>(null);
+
+  const handleBulkUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = event.target?.result;
+        const workbook = XLSX.read(data, { type: 'binary' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+        let successCount = 0;
+        rows.forEach(row => {
+          if (row.SKU || row.sku) {
+            addInventoryItem({
+              sku: String(row.SKU || row.sku),
+              hsn: String(row.HSN || row.hsn || ''),
+              productName: String(row.ProductName || row.productName || row['Product Name'] || ''),
+              quantity: parseInt(row.Quantity || row.quantity || 0),
+              costPrice: parseFloat(row.CostPrice || row.costPrice || row['Cost Price'] || 0),
+              sellingPrice: parseFloat(row.SellingPrice || row.sellingPrice || row['Selling Price'] || 0),
+              imageUrl: String(row.ImageUrl || row.imageUrl || ''),
+              description: String(row.Description || row.description || ''),
+              category: String(row.Category || row.category || ''),
+            });
+            successCount++;
+          }
+        });
+
+        toast({
+          title: 'Bulk Upload Success',
+          description: `Imported ${successCount} items to inventory`,
+        });
+      } catch (error) {
+        toast({
+          title: 'Bulk Upload Failed',
+          description: 'Error parsing the file. Please check the format.',
+          variant: 'destructive',
+        });
+      }
+    };
+    reader.readAsBinaryString(file);
+    if (e.target) e.target.value = '';
+  };
   const [formData, setFormData] = useState({
     sku: '',
     hsn: '',
@@ -233,6 +282,17 @@ const Inventory: React.FC = () => {
           <p className="text-muted-foreground">Manage your unified inventory with HSN codes</p>
         </div>
         <div className="flex gap-2">
+          <input
+            ref={bulkInputRef}
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            className="hidden"
+            onChange={handleBulkUpload}
+          />
+          <Button variant="outline" onClick={() => bulkInputRef.current?.click()}>
+            <UploadIcon className="w-4 h-4 mr-2" />
+            Bulk Upload
+          </Button>
           <Button variant="outline" onClick={exportToCSV}>
             <Download className="w-4 h-4 mr-2" />
             Export
