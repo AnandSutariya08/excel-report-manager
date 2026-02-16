@@ -93,14 +93,15 @@ const Dashboard: React.FC = () => {
     );
     
     const totalRevenue = delivered.reduce((sum, o) => sum + (o.netAmount || 0), 0);
-    const totalCost = delivered.reduce((sum, o) => sum + ((o.wholesalePrice || 0) * (o.quantity || 0)), 0);
+    const totalCost = delivered.reduce((sum, o) => {
+      const invItem = inventory.find(i => i.sku === o.sku);
+      const costPrice = invItem ? invItem.costPrice : (o.wholesalePrice || 0);
+      return sum + (costPrice * (o.quantity || 0));
+    }, 0);
     const totalCommission = delivered.reduce((sum, o) => sum + (o.commission || 0), 0);
     const totalShipping = delivered.reduce((sum, o) => sum + (o.shippingCharge || 0), 0);
     const totalTax = delivered.reduce((sum, o) => sum + (o.cgst || 0) + (o.sgst || 0) + (o.igst || 0), 0);
     
-    // Profit = Net Received Amount - Cost Price - Other Expenses if not already in netAmount
-    // In this context, netAmount often already includes commission/shipping deductions in marketplace reports
-    // but we'll stick to the user's requirement of "finding profit and loss"
     const profit = totalRevenue - totalCost;
     const netProfit = profit - totalCommission - totalShipping;
     const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
@@ -118,7 +119,7 @@ const Dashboard: React.FC = () => {
       totalTax,
       averageOrderValue: delivered.length > 0 ? totalRevenue / delivered.length : 0,
     };
-  }, [filteredOrders]);
+  }, [filteredOrders, inventory]);
 
   // Platform-wise performance
   const platformPerformance = useMemo(() => {
@@ -128,8 +129,11 @@ const Dashboard: React.FC = () => {
       const platform = companies.flatMap(c => c.platforms).find(p => p.id === order.platformId);
       const platformName = platform?.name || 'Unknown';
       
+      const invItem = inventory.find(i => i.sku === order.sku);
+      const costPrice = invItem ? invItem.costPrice : (order.wholesalePrice || 0);
+      
       const existing = platformMap.get(order.platformId) || { name: platformName, revenue: 0, profit: 0, orders: 0 };
-      const orderProfit = (order.netAmount || 0) - ((order.wholesalePrice || 0) * (order.quantity || 0)) - (order.commission || 0) - (order.shippingCharge || 0);
+      const orderProfit = (order.netAmount || 0) - (costPrice * (order.quantity || 0)) - (order.commission || 0) - (order.shippingCharge || 0);
       
       platformMap.set(order.platformId, {
         name: platformName,
@@ -140,7 +144,7 @@ const Dashboard: React.FC = () => {
     });
 
     return Array.from(platformMap.values()).sort((a, b) => b.revenue - a.revenue);
-  }, [filteredOrders, companies]);
+  }, [filteredOrders, companies, inventory]);
 
   // State-wise performance
   const statePerformance = useMemo(() => {
@@ -198,20 +202,26 @@ const Dashboard: React.FC = () => {
 
   // Daily trend data
   const dailyTrend = useMemo(() => {
-    const dayMap = new Map<string, { date: string; orders: number; revenue: number }>();
+    const dayMap = new Map<string, { date: string; orders: number; revenue: number; profit: number }>();
     
-    filteredOrders.filter(o => o.status === 'delivered').forEach(order => {
+    filteredOrders.filter(o => o.status?.toLowerCase() === 'delivered').forEach(order => {
       const date = new Date(order.orderDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
-      const existing = dayMap.get(date) || { date, orders: 0, revenue: 0 };
+      const existing = dayMap.get(date) || { date, orders: 0, revenue: 0, profit: 0 };
+      
+      const invItem = inventory.find(i => i.sku === order.sku);
+      const costPrice = invItem ? invItem.costPrice : (order.wholesalePrice || 0);
+      const orderProfit = (order.netAmount || 0) - (costPrice * (order.quantity || 0)) - (order.commission || 0) - (order.shippingCharge || 0);
+
       dayMap.set(date, {
         date,
         orders: existing.orders + 1,
-        revenue: existing.revenue + order.netAmount,
+        revenue: existing.revenue + (order.netAmount || 0),
+        profit: existing.profit + orderProfit,
       });
     });
 
     return Array.from(dayMap.values()).slice(-30);
-  }, [filteredOrders]);
+  }, [filteredOrders, inventory]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -341,6 +351,10 @@ const Dashboard: React.FC = () => {
                       <stop offset="5%" stopColor="hsl(173, 80%, 45%)" stopOpacity={0.3}/>
                       <stop offset="95%" stopColor="hsl(173, 80%, 45%)" stopOpacity={0}/>
                     </linearGradient>
+                    <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(142, 76%, 45%)" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="hsl(142, 76%, 45%)" stopOpacity={0}/>
+                    </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(222, 30%, 18%)" />
                   <XAxis dataKey="date" stroke="hsl(215, 20%, 55%)" fontSize={12} />
@@ -351,14 +365,24 @@ const Dashboard: React.FC = () => {
                       border: '1px solid hsl(222, 30%, 18%)',
                       borderRadius: '8px',
                     }}
-                    formatter={(value: number) => [`₹${value.toLocaleString('en-IN')}`, 'Revenue']}
+                    formatter={(value: number) => [`₹${value.toLocaleString('en-IN')}`, 'Amount']}
                   />
+                  <Legend />
                   <Area
                     type="monotone"
                     dataKey="revenue"
+                    name="Revenue"
                     stroke="hsl(173, 80%, 45%)"
                     strokeWidth={2}
                     fill="url(#colorRevenue)"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="profit"
+                    name="Profit"
+                    stroke="hsl(142, 76%, 45%)"
+                    strokeWidth={2}
+                    fill="url(#colorProfit)"
                   />
                 </AreaChart>
               </ResponsiveContainer>
