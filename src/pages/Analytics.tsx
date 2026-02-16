@@ -67,7 +67,7 @@ interface StateAnalysis {
 }
 
 const Analytics: React.FC = () => {
-  const { companies, orders, returns } = useData();
+  const { companies, orders, returns, inventory } = useData();
   const [selectedCompany, setSelectedCompany] = useState<string>('all');
   const [selectedPlatform, setSelectedPlatform] = useState<string>('all');
   const [timeRange, setTimeRange] = useState<string>('all');
@@ -165,9 +165,13 @@ const Analytics: React.FC = () => {
       existing.totalQuantity += order.quantity || 0;
 
       if (isDelivered) {
+        // Find matching inventory item for real cost price
+        const invItem = inventory.find(i => i.sku === order.sku);
+        const costPrice = invItem ? invItem.costPrice : (order.wholesalePrice || 0);
+        
         // Revenue calculation using Selling Price
         const revenue = (order.sellingPrice || 0) * (order.quantity || 1);
-        const cost = (order.wholesalePrice || 0) * (order.quantity || 1);
+        const cost = costPrice * (order.quantity || 1);
         
         existing.totalSales += revenue;
         existing.totalCost += cost;
@@ -254,8 +258,11 @@ const Analytics: React.FC = () => {
       existing.orders += 1;
 
       if (isDelivered) {
+        const invItem = inventory.find(i => i.sku === order.sku);
+        const costPrice = invItem ? invItem.costPrice : (order.wholesalePrice || 0);
+        
         const revenue = (order.sellingPrice || 0) * (order.quantity || 1);
-        const cost = (order.wholesalePrice || 0) * (order.quantity || 1);
+        const cost = costPrice * (order.quantity || 1);
         existing.revenue += revenue;
         existing.profit += revenue - cost - (order.commission || 0) - 
                           (order.shippingCharge || 0) - (order.refundAmount || 0) - 
@@ -293,8 +300,11 @@ const Analytics: React.FC = () => {
     const totalSales = delivered.reduce((sum, o) => 
       sum + ((o.sellingPrice || 0) * (o.quantity || 1)), 0);
     
-    const totalCost = delivered.reduce((sum, o) => 
-      sum + ((o.wholesalePrice || 0) * (o.quantity || 1)), 0);
+    const totalCost = delivered.reduce((sum, o) => {
+      const invItem = inventory.find(i => i.sku === o.sku);
+      const costPrice = invItem ? invItem.costPrice : (o.wholesalePrice || 0);
+      return sum + (costPrice * (o.quantity || 1));
+    }, 0);
     
     const totalCommission = delivered.reduce((sum, o) => sum + (o.commission || 0), 0);
     const totalShipping = delivered.reduce((sum, o) => sum + (o.shippingCharge || o.shipperCharge || 0), 0);
@@ -335,8 +345,11 @@ const Analytics: React.FC = () => {
       const date = order.orderDate ? new Date(order.orderDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'Unknown';
       const existing = dayMap.get(date) || { date, sales: 0, profit: 0, orders: 0 };
       
+      const invItem = inventory.find(i => i.sku === order.sku);
+      const costPrice = invItem ? invItem.costPrice : (order.wholesalePrice || 0);
+      
       const revenue = (order.sellingPrice || 0) * (order.quantity || 1);
-      const cost = (order.wholesalePrice || 0) * (order.quantity || 1);
+      const cost = costPrice * (order.quantity || 1);
       const profit = revenue - cost - (order.commission || 0) - (order.shippingCharge || 0) - 
                     (order.refundAmount || 0) - (order.deductionAmount || 0);
 
