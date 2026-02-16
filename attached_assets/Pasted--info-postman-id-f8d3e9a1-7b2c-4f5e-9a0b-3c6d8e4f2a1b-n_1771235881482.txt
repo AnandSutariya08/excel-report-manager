@@ -1,0 +1,172 @@
+{
+  "info": {
+    "_postman_id": "f8d3e9a1-7b2c-4f5e-9a0b-3c6d8e4f2a1b",
+    "name": "Multi-Service Manager API (WiFi + MDM + VideoCall + others)",
+    "description": "Collection for testing /api/v1/service endpoint\n\nPurpose: Manage configuration for different services (WiFi networks, MDM profiles, VideoCall setups, etc.)\nAll records stored in kind = 'servicenetwork'\n\n**Strongly recommended**: Add \"serviceType\" field (string) to every record:\n  • wifi\n  • mdm-profile\n  • videocall\n  • vpn\n  • email\n  • other\n\n**Base URL** examples:\n• Local : http://localhost:8080\n• Cloud  : https://REGION-PROJECT.cloudfunctions.net/service\n\n**Authentication**: Bearer Firebase ID Token",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create - WiFi Network (most common)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 201\", function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "",
+              "pm.test(\"Response has data.id\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.data).to.have.property('id');",
+              "    pm.environment.set(\"last_wifi_id\", jsonData.data.id);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{id_token}}", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"serviceType\": \"wifi\",\n  \"ssid\": \"Company-Office-5G\",\n  \"securitytype\": \"WPA2-PSK\",\n  \"password\": \"SecurePass2026!\",\n  \"hidden\": false,\n  \"autoJoin\": true,\n  \"priority\": 10,\n  \"description\": \"Main office WiFi - managed via MDM\",\n  \"proxy\": {\n    \"type\": \"manual\",\n    \"host\": \"proxy.company.in\",\n    \"port\": 8080\n  }\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/service",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "service"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Create - MDM Profile (example)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{id_token}}", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"serviceType\": \"mdm-profile\",\n  \"profileName\": \"Strict-Employee-iOS\",\n  \"platform\": \"ios\",\n  \"restrictions\": {\n    \"allowCamera\": false,\n    \"allowAppInstall\": true,\n    \"forcePasscode\": true,\n    \"maxPasscodeAgeDays\": 90\n  },\n  \"payload\": {\n    \"wifi\": {\n      \"ssid\": \"Corp-Secure\",\n      \"security\": \"WPA2-Enterprise\"\n    },\n    \"vpn\": {\n      \"type\": \"IKEv2\",\n      \"server\": \"vpn.company.in\"\n    }\n  },\n  \"targetDevices\": \"all-managed\",\n  \"description\": \"iOS corporate restrictions profile\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/service",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "service"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Create - Video Call Service Config",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{id_token}}", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"serviceType\": \"videocall\",\n  \"provider\": \"agora | twilio | zoom | 100ms | custom\",\n  \"appId\": \"123e4567-e89b-12d3-a456-426614174000\",\n  \"apiKey\": \"sk_live_abc123xyz\",\n  \"defaultResolution\": \"720p\",\n  \"maxParticipants\": 50,\n  \"features\": {\n    \"screenShare\": true,\n    \"recording\": false,\n    \"noiseSuppression\": true,\n    \"virtualBackground\": true\n  },\n  \"webhookUrl\": \"https://your-server.com/videocall-events\",\n  \"description\": \"Main internal team video meetings\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/service",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "service"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "List / Search all services (with filter)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{id_token}}", "type": "text" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/service?limit=15&offset=0&q=wifi OR videocall&serviceType=wifi",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "service"],
+          "query": [
+            { "key": "limit", "value": "15" },
+            { "key": "offset", "value": "0" },
+            { "key": "q", "value": "wifi OR videocall", "description": "free text search" },
+            { "key": "serviceType", "value": "wifi", "disabled": true, "description": "if you add serviceType filter in future" }
+          ]
+        },
+        "description": "Search supports free text (q) → works across all fields\nLater: consider adding ?serviceType=wifi filter in backend"
+      },
+      "response": []
+    },
+    {
+      "name": "Update any service (partial)",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{id_token}}", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"password\": \"NewSuperSecure2026!!\",\n  \"hidden\": true,\n  \"priority\": 5,\n  \"description\": \"Updated - high priority office WiFi\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/service/{{last_wifi_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "service", "{{last_wifi_id}}"]
+        },
+        "description": "Use any id from previous create responses"
+      },
+      "response": []
+    },
+    {
+      "name": "Delete service config",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{id_token}}", "type": "text" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/service/{{last_wifi_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "service", "{{last_wifi_id}}"]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://your-region-your-project.cloudfunctions.net/service",
+      "type": "string",
+      "description": "Cloud Function URL (or http://localhost:8080 for local)"
+    },
+    {
+      "key": "id_token",
+      "value": "",
+      "type": "string",
+      "description": "Firebase Auth ID token (get from console / your app)"
+    },
+    {
+      "key": "last_wifi_id",
+      "value": "",
+      "type": "string",
+      "description": "Auto-filled after Create WiFi request (via test script)"
+    }
+  ],
+  "auth": { "type": "noauth" }
+}
