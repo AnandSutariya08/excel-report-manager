@@ -2,6 +2,7 @@ import React from 'react';
 import { Menu, Search, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -37,6 +38,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, title }) => {
           <Bell className="w-5 h-5" />
           <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full" />
         </Button>
+        <ThemeToggle />
       </div>
     </header>
   );
