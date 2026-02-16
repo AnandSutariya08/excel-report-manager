@@ -66,6 +66,8 @@ interface StateAnalysis {
   profit: number;
 }
 
+const formatCurrency = (value: number) => `₹${Math.abs(value).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+
 const Analytics: React.FC = () => {
   const { companies, orders, returns, inventory } = useData();
   const [selectedCompany, setSelectedCompany] = useState<string>('all');

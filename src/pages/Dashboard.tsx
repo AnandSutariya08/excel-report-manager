@@ -365,7 +365,7 @@ const Dashboard: React.FC = () => {
                       border: '1px solid hsl(222, 30%, 18%)',
                       borderRadius: '8px',
                     }}
-                    formatter={(value: number) => [`₹${value.toLocaleString('en-IN')}`, 'Amount']}
+                    formatter={(value: number, name: string) => [`₹${value.toLocaleString('en-IN')}`, name]}
                   />
                   <Legend />
                   <Area
