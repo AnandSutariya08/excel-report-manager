@@ -85,19 +85,25 @@ const Dashboard: React.FC = () => {
 
   // Calculate metrics
   const metrics = useMemo(() => {
-    const delivered = filteredOrders.filter(o => o.status === 'delivered');
+    const delivered = filteredOrders.filter(o => o.status?.toLowerCase() === 'delivered');
     const returned = filteredOrders.filter(o => 
-      o.status.includes('return') || o.status === 'returntoseller' || o.status === 'returntosellerinitiated'
+      o.status?.toLowerCase().includes('return') || 
+      o.status?.toLowerCase() === 'returntoseller' || 
+      o.status?.toLowerCase() === 'returntosellerinitiated'
     );
     
-    const totalRevenue = delivered.reduce((sum, o) => sum + o.netAmount, 0);
-    const totalCost = delivered.reduce((sum, o) => sum + (o.wholesalePrice * o.quantity), 0);
-    const totalCommission = delivered.reduce((sum, o) => sum + o.commission, 0);
-    const totalShipping = delivered.reduce((sum, o) => sum + o.shippingCharge, 0);
-    const totalTax = delivered.reduce((sum, o) => sum + o.cgst + o.sgst + o.igst, 0);
+    const totalRevenue = delivered.reduce((sum, o) => sum + (o.netAmount || 0), 0);
+    const totalCost = delivered.reduce((sum, o) => sum + ((o.wholesalePrice || 0) * (o.quantity || 0)), 0);
+    const totalCommission = delivered.reduce((sum, o) => sum + (o.commission || 0), 0);
+    const totalShipping = delivered.reduce((sum, o) => sum + (o.shippingCharge || 0), 0);
+    const totalTax = delivered.reduce((sum, o) => sum + (o.cgst || 0) + (o.sgst || 0) + (o.igst || 0), 0);
     
-    const profit = totalRevenue - totalCost - totalCommission - totalShipping;
-    const profitMargin = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0;
+    // Profit = Net Received Amount - Cost Price - Other Expenses if not already in netAmount
+    // In this context, netAmount often already includes commission/shipping deductions in marketplace reports
+    // but we'll stick to the user's requirement of "finding profit and loss"
+    const profit = totalRevenue - totalCost;
+    const netProfit = profit - totalCommission - totalShipping;
+    const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
     return {
       totalOrders: filteredOrders.length,
@@ -105,7 +111,7 @@ const Dashboard: React.FC = () => {
       returnedOrders: returned.length,
       totalRevenue,
       totalCost,
-      profit,
+      profit: netProfit,
       profitMargin,
       totalCommission,
       totalShipping,
@@ -113,6 +119,28 @@ const Dashboard: React.FC = () => {
       averageOrderValue: delivered.length > 0 ? totalRevenue / delivered.length : 0,
     };
   }, [filteredOrders]);
+
+  // Platform-wise performance
+  const platformPerformance = useMemo(() => {
+    const platformMap = new Map<string, { name: string; revenue: number; profit: number; orders: number }>();
+    
+    filteredOrders.filter(o => o.status?.toLowerCase() === 'delivered').forEach(order => {
+      const platform = companies.flatMap(c => c.platforms).find(p => p.id === order.platformId);
+      const platformName = platform?.name || 'Unknown';
+      
+      const existing = platformMap.get(order.platformId) || { name: platformName, revenue: 0, profit: 0, orders: 0 };
+      const orderProfit = (order.netAmount || 0) - ((order.wholesalePrice || 0) * (order.quantity || 0)) - (order.commission || 0) - (order.shippingCharge || 0);
+      
+      platformMap.set(order.platformId, {
+        name: platformName,
+        revenue: existing.revenue + (order.netAmount || 0),
+        profit: existing.profit + orderProfit,
+        orders: existing.orders + 1,
+      });
+    });
+
+    return Array.from(platformMap.values()).sort((a, b) => b.revenue - a.revenue);
+  }, [filteredOrders, companies]);
 
   // State-wise performance
   const statePerformance = useMemo(() => {
@@ -390,6 +418,45 @@ const Dashboard: React.FC = () => {
 
       {/* Performance Tables */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Platform Performance */}
+        <Card className="bg-card/80 backdrop-blur-xl border-border/50">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-primary" />
+              Platform-wise Profit & Loss
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px]">
+              {platformPerformance.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={platformPerformance}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(222, 30%, 18%)" />
+                    <XAxis dataKey="name" stroke="hsl(215, 20%, 55%)" fontSize={12} />
+                    <YAxis stroke="hsl(215, 20%, 55%)" fontSize={12} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'hsl(222, 47%, 9%)',
+                        border: '1px solid hsl(222, 30%, 18%)',
+                        borderRadius: '8px',
+                      }}
+                      formatter={(value: number) => [`₹${value.toLocaleString('en-IN')}`, 'Amount']}
+                    />
+                    <Legend />
+                    <Bar dataKey="revenue" name="Revenue" fill="hsl(173, 80%, 45%)" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="profit" name="Profit/Loss" fill="hsl(142, 76%, 45%)" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                  <BarChart3 className="w-12 h-12 mb-2 opacity-50" />
+                  <p className="text-sm">No platform data available</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Top Products */}
         <Card className="bg-card/80 backdrop-blur-xl border-border/50">
           <CardHeader>
